@@ -275,9 +275,19 @@ module.exports = {
 				result = await response.text()
 			}
 		} catch (error) {
-			// the device closed the connection while sending the body (undici: "terminated"); report it like any
-			// other connection failure, with the underlying cause (e.g. UND_ERR_SOCKET)
 			const isTimeout = error?.name === 'TimeoutError' || error?.name === 'AbortError'
+			// The Pearl's web server now and then sends a damaged answer (a dropped connection, or a broken chunked
+			// body such as "Expected LF after chunk data"). A GET changes nothing on the device, so it is asked once
+			// more before the poll counts as failed; a request that timed out or was aborted is not repeated.
+			if (verb === 'GET' && !isTimeout && !opts.retried) {
+				if (config.verbose)
+					this.log(
+						'debug',
+						`Retrying ${verb} ${url} after a damaged response: ${error?.cause?.message || error?.message}`,
+					)
+				return this.request(method, path, { ...opts, retried: true })
+			}
+			// report it like any other connection failure, with the underlying cause (e.g. UND_ERR_SOCKET)
 			const cause = error?.cause
 			const reason = `${cause?.message || error?.message || error}${cause?.code ? ` (${cause.code})` : ''}`
 			const message = isTimeout

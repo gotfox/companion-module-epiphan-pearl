@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.3] (2026-11-14)
+
+- A damaged answer from the encoder (a dropped connection, or a broken chunked body such as "Expected LF after chunk data") no longer fails the whole poll: a read request is repeated once before the connection is reported as failed.
+
 ## [3.0.2] (2026-11-14)
 
 - A failed request for the presets, the schedule events or the single touch controls no longer logs "Device configuration has changed" (twice, on failure and on recovery) and rebuilds all actions, feedbacks and presets; the last known lists are kept.

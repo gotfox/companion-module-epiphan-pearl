@@ -31,6 +31,8 @@ describe('request layer', () => {
 	})
 
 	it('reports a connection dropped while the body is read as an EncoderApiError, not a bare "terminated"', async () => {
+		// the same GET is damaged twice: the retry does not help
+		mock.truncateNext('GET', '/api/v2.0/recorders')
 		mock.truncateNext('GET', '/api/v2.0/recorders')
 		await assert.rejects(
 			() => instance.request('GET', '/recorders', { silent: true }),
@@ -45,6 +47,22 @@ describe('request layer', () => {
 		// the next request works and the status recovers
 		await instance.request('GET', '/recorders')
 		assert.equal(instance.currentStatus, InstanceStatus.Ok)
+	})
+
+	it('asks a GET once more when the answer is damaged, and succeeds when the second answer is fine', async () => {
+		mock.requests.length = 0
+		mock.truncateNext('GET', '/api/v2.0/recorders')
+		const list = await instance.request('GET', '/recorders', { silent: true })
+		assert.ok(Array.isArray(list))
+		assert.equal(mock.requests.filter((r) => r.path === '/api/v2.0/recorders').length, 2)
+		assert.equal(instance.currentStatus, InstanceStatus.Ok)
+	})
+
+	it('never repeats a request that changes something on the device', async () => {
+		mock.requests.length = 0
+		mock.truncateNext('POST', '/api/v2.0/channels/1/publishers/0/control/stop')
+		await assert.rejects(() => instance.request('POST', '/channels/1/publishers/0/control/stop', { silent: true }))
+		assert.equal(mock.requests.filter((r) => r.method === 'POST').length, 1)
 	})
 
 	it('returns true for an ok envelope without result', async () => {
